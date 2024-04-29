@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=Krita/PythonPlugin
+X-KDE-Library=path_simplify_plugin
+X-Python-2-Compatible=false
+X-Krita-Manual=Manual.html
+Name=PathSimplify
+Comment=Simplify SVG shape line segments.
