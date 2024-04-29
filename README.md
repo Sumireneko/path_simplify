@@ -21,7 +21,7 @@ If work success,it would be append new Vector Layer as contain simplified path d
 * Shapes that has hole pathes
 
 
-#### Tolerance value**Default**:0.8  
+#### Tolerance value  (**Default**:0.8)  
 	Increase this value, effect strongly ,and more simple polygonal result.
  
 * **Ineffective**: 0.0 - 0.4  
@@ -29,7 +29,7 @@ If work success,it would be append new Vector Layer as contain simplified path d
 * **Polygonalize**: 1.5 - 2.5  
 * **Simple N-gon**: 3.0 - 5.0  
 
-#### Quality option**Default**:Checked  
+#### Quality option  (**Default**:Checked)  
 	If it checked,it try to make it as close to the original Shape as possible.
  
 
