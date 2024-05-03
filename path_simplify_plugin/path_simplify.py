@@ -1,5 +1,5 @@
 # ======================================
-# Krita path simplify plug-in v0.2
+# Krita path simplify plug-in v0.4
 # ======================================
 # Copyright (C) 2024 L.Sumireneko.M
 # This program is free software: you can redistribute it and/or modify it under the 
@@ -18,26 +18,26 @@ from PyQt5.QtWidgets import *
 from PyQt5.Qt import *
 from PyQt5.QtGui import *
 from PyQt5 import QtCore
-import re
+import re,math,time
+
 
 
 tolr = 0.8 # Tolerance smooth 0.8 - 1.5 rough
 quality = True # precision mode ( Default:True)
-
+remv_orig = False # Remove original
 
 # ====================
 # Krita io function
 # ====================
 
-def get_array(path,tolr,quality):
+def get_array(name,path,tolr,quality):
     # Filterling 
     if not path.startswith('<path'):
         message("Selected shape isn't Path Line \n  Circle,Rectangle and Polyline are \n no need to simplify probably.")
         return None
  
     # get original path information
-    # id
-    id = re.search(r'\sid="(.*?)"', path ).group(1)
+    # id = re.search(r'\sid="(.*?)"', path ).group(1)
     
     # path data
     p = re.search(r'\sd="(.*?)"', path )
@@ -131,7 +131,7 @@ So it will works.
         o+="Z"
         # ms for loop end
     # make one smplifyed path data
-    o=f'<path id="{id}_s" {tr} {fi} {st} {sw} {ca} {jo} d="{o}"/>'
+    o=f'<path id="{name}" {tr} {fi} {st} {sw} {ca} {jo} d="{o}"/>'
     
     # print("=== simplified ===")
     # print(o)
@@ -269,56 +269,94 @@ def simplify(points, tolerance=0.1, highestQuality=True):
 def message(mes):
     mb = QMessageBox()
     mb.setText(str(mes))
+    mb.setWindowTitle('Message')
     mb.setStandardButtons(QMessageBox.Ok)
     ret = mb.exec()
     if ret == QMessageBox.Ok:
         pass # OK clicked
 
+# create dialog  and show it
+def notice_autoclose_dialog(message):
+    app = Krita.instance()
+    qwin = app.activeWindow().qwindow()
+    qq = qwin.size()
+    wpos = math.ceil(qq.width() * 0.45)
+    hpos = math.ceil(qq.height() * 0.45)
+    
+    noticeDialog = QDialog() 
+    noticeDialog.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+    label = QLabel(message)
+    hboxd = QHBoxLayout()
+    hboxd.addWidget(label)
+    noticeDialog.setLayout(hboxd)
+    noticeDialog.setWindowTitle("Title") 
+    
+    print(qwin.x(),wpos,hpos)
+    noticeDialog.move(qwin.x()+wpos,qwin.y()+hpos)
+    QtCore.QTimer.singleShot(1500, noticeDialog.close)
+    noticeDialog.exec_() # show
+
+# debug
+
+def d(text):
+    return text;
+
+def dprint(text):
+    message(text)
+
 # ====================
 # Main function
 # ====================
 
-def main(tolr,quality):
+
+
+def main(tolr,quality,remv_orig):
     app = Krita.instance()
     doc = app.activeDocument()
     lay = doc.activeNode()
-
+    selected_shapes = None
     if lay.type() == 'vectorlayer':
         app.action('InteractionTool').trigger()# Select shape tool
         shapes = lay.shapes()
         #print(" "+str(len(shapes))+" shapes found in this active VectorLayer")
         #print(lay.toSvg())
         selected_shapes = []
-        #print("-- ↑ Front -- ") 
+        sel_cnt=0
+        debug=""
+        #debug+=d("-- ↑ Front -- \n") 
         
         # Get All shape info
         # Range = len()-1 .... 0 
         for i in range(len(shapes)-1,-1,-1):
             sp = shapes[i]
-            #print(f'* Shape({i}), Name: {sp.name()}  ,Type: {sp.type()} , isSelected?: {sp.isSelected()} , ID :{sp} ')
+            #debug+=d(f'* Shape({i}), Name: {sp.name()}  ,Type: {sp.type()} , isSelected?: {sp.isSelected()} , ID :{sp} \n')
 
             # Get the selected shape
             if sp.isSelected() == True:
+                sel_cnt += 1
                 if sp.type()=='groupshape':
                     # extend groupshape
-                    #print(sp.toSvg())
+                    #debug+=d(sp.toSvg()+"\n")
                     g_transfrom = re.search( r'<g.*?>', sp.toSvg()).group()
                     g_shape = sp.children()
                     selected_shapes.append('</g>')
                     selected_shapes.extend(g_shape)
                     selected_shapes.append(g_transfrom)
                     #for m in sp.children():
-                    #    print(m.name(),m.type())
+                    #    debug+=d(m.name(),m.type())
                     continue;
                 selected_shapes.append(sp)
-        #print("-- ↓ Back -- ")
         
-        #print(" ")
-        #print(f" {len(selected_shapes)} / {len(shapes)} shapes selected")
+        
+        #debug+=d("-- ↓ Back -- \n")
+        #debug+=d(f" {len(selected_shapes)} / {len(shapes)} shapes selected\n")
+        #dprint(debug)
 
         # Create a simplifyed svg src
         new_src = ""
         new_path = ""
+        sel_ids = []
+        
         # Get the selected shapes info
         for j in range(len(selected_shapes)-1,-1,-1):
             s = selected_shapes[j]
@@ -336,8 +374,13 @@ def main(tolr,quality):
             # print(" ------------------ ")
             # print(f'* Shape({j}), Type:{type} , \n '+s.toSvg())
 
+            if name == "":
+                tid = round(time.time())
+                name = f"shape{tid}_s"
+            sel_ids.append(name)
+
             src = s.toSvg()
-            new_path = get_array(src,tolr,quality)
+            new_path = get_array(name,src,tolr,quality)
             if new_path is None:break
             new_src+= new_path
 
@@ -353,15 +396,36 @@ def main(tolr,quality):
         # print(newsrc)
 
         # Output to VectorLayer
-        # The case that add to new VectorLayer
-        if len(new_src) > 0:
+        # Remove original, and Add to current VectorLayer
+
+        if remv_orig == True:
+            for j in range(len(selected_shapes)-1,-1,-1):
+                s = selected_shapes[j]
+                # The case groupshape
+                if isinstance(s, str):continue
+                s.remove()
+            lay.addShapesFromSvg(new_src)
+            
+            # Re-Selection
+            updated_shapes = lay.shapes()
+            for j in updated_shapes:
+                if j.name() in sel_ids:
+                    j.select()
+            app.action('PathTool').trigger()
+            
+
+        # Add to new VectorLayer
+        elif len(selected_shapes) > 0:
             root = doc.rootNode()
             vnode = doc.createVectorLayer('Simplified path data')
             vnode.addShapesFromSvg(new_src)
             root.addChildNode(vnode , None )
-
-        # The case that add to current VectorLayer
-        # lay.addShapesFromSvg(new_src)
+            
+        
+        if selected_shapes is None or len(selected_shapes)==0: notice_autoclose_dialog('No selection for vector shape(s)')
+        elif remv_orig == True:notice_autoclose_dialog('Path simplify finished (Replaced)')
+        else:notice_autoclose_dialog('Path simplify finished!')
+        # End of function
 
 
 # ====================================
@@ -382,7 +446,15 @@ hbox.addWidget(texbox)
 chkbox = QCheckBox("Hi-Quality")
 chkbox.setChecked(True)
 chkbox.setToolTip('If it checked,it try to make it \nas close to the original Shape \nas possible.')
-hbox.addWidget(chkbox)
+
+chkbox2 = QCheckBox("Remove Original")
+chkbox2.setChecked(False)
+chkbox2.setToolTip('If it checked,the original shape replaced \n to simplified one.')
+
+
+hbox2 = QHBoxLayout()
+hbox2.addWidget(chkbox)
+hbox2.addWidget(chkbox2)
 
 
 def get_param(txt):
@@ -408,11 +480,11 @@ class Simplify_docker(DockWidget):
         btn = QPushButton("Simplify the selected\n Vector shape!",self)
         btn.setToolTip('This can apply to SVG path with\n line segment only')
         btn.clicked.connect(self.exec_)
-        labele = QLabel('Reduce points of Vector Path for\n   * Boolean-ed Shape \n   * Create shape from Selection\n   * No support an Ellipse and a Rectangle')
+        labele = QLabel('Reduce points of Vector Path for\n * Boolean-ed Shape \n * Create shape from Selection\n * No for Ellipse and Rectangle')
         
         layout.addWidget(labele)
         layout.addLayout(hbox)
-
+        layout.addLayout(hbox2)
         hlayout.addWidget(btn)
 
         layout.addLayout(hlayout)
@@ -424,14 +496,16 @@ class Simplify_docker(DockWidget):
         self.setWidget(widget)
 
     def exec_(self):
-        global tolr,quality
-        if QtCore.Qt.Checked == chkbox.checkState():
-            quality = True
-        else:
-            quality = False
+        global tolr,quality,remv_orig
+        if QtCore.Qt.Checked == chkbox.checkState():quality = True
+        else:quality = False
+
+        if QtCore.Qt.Checked == chkbox2.checkState():remv_orig = True
+        else:remv_orig = False
+
         tolr = get_param(texbox.text())
         # message(f' Push Button {tolr},{quality}')
-        main(tolr,quality)
+        main(tolr,quality,remv_orig)
         
     def canvasChanged(self, canvas):
         pass
