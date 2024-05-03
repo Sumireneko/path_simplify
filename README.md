@@ -3,6 +3,15 @@ Krita plugin for vector path simplify.
 
 About Path Simplify plug-in
 ---------------------------
+#### v0.4
+Keep former selection if replace original  
+(The initial shape selection is maintained so you know which shape has been updated.)  
+The v0.3 uploaded wrong file positon,so fixed it.  
+So removed v0.3 release.  
+
+#### v0.3
+The replace option that when finish simplified after, remove Original shape  
+Notice dialog (It appear when finish simplified ,and automatically close in 1500 msec after)  
 
 #### v0.2
 This plug-in provide simplify for vector path.  
