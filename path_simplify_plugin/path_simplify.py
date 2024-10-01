@@ -1,5 +1,5 @@
 # ======================================
-# Krita path simplify plug-in v0.4
+# Krita path simplify plug-in v0.5
 # ======================================
 # Copyright (C) 2024 L.Sumireneko.M
 # This program is free software: you can redistribute it and/or modify it under the 
@@ -322,7 +322,7 @@ def main(tolr,quality,remv_orig):
         #print(lay.toSvg())
         selected_shapes = []
         sel_cnt=0
-        debug=""
+        #debug=""
         #debug+=d("-- ↑ Front -- \n") 
         
         # Get All shape info
@@ -346,7 +346,6 @@ def main(tolr,quality,remv_orig):
                     #    debug+=d(m.name(),m.type())
                     continue;
                 selected_shapes.append(sp)
-        
         
         #debug+=d("-- ↓ Back -- \n")
         #debug+=d(f" {len(selected_shapes)} / {len(shapes)} shapes selected\n")
@@ -457,6 +456,25 @@ hbox2.addWidget(chkbox)
 hbox2.addWidget(chkbox2)
 
 
+# Boolean bypass (Unite Intersect Subtract Split)
+hbox3 = QHBoxLayout()
+btn_u = QPushButton();btn_u.setIcon(Krita.instance().icon('selection_add'))
+btn_i = QPushButton();btn_i.setIcon(Krita.instance().icon('selection_intersect'))
+btn_s = QPushButton();btn_s.setIcon(Krita.instance().icon('selection_subtract'))
+btn_sp = QPushButton();btn_sp.setIcon(Krita.instance().icon('selection_symmetric_difference'))
+
+
+btn_u.setToolTip('Unite(Simplify):Create boolean union of mutiple shapes')
+btn_i.setToolTip('Intersect(Simplify):Create intersection of mutiple shapes')
+btn_s.setToolTip('Subtract(Simplify):Subtract multiple objects from the first selected one')
+btn_sp.setToolTip('Split:Split shapes with multiple subpaths into multiple shapes')
+
+hbox3.addWidget(btn_u)
+hbox3.addWidget(btn_i)
+hbox3.addWidget(btn_s)
+hbox3.addWidget(btn_sp)
+
+
 def get_param(txt):
     #print("Param:"+str(txt))
     if txt == '':txt='0'
@@ -485,6 +503,7 @@ class Simplify_docker(DockWidget):
         layout.addWidget(labele)
         layout.addLayout(hbox)
         layout.addLayout(hbox2)
+        layout.addLayout(hbox3)
         hlayout.addWidget(btn)
 
         layout.addLayout(hlayout)
@@ -492,8 +511,33 @@ class Simplify_docker(DockWidget):
         total_layout.addSpacing(16)
         total_layout.addLayout(layout)
         total_layout.addSpacing(16)
+
+
+        btn_u.clicked.connect(self.pathfinder_add)
+        btn_i.clicked.connect(self.pathfinder_intersect)
+        btn_s.clicked.connect(self.pathfinder_subtract)
+        btn_sp.clicked.connect(self.pathfinder_split)
+
+
         widget.setLayout(total_layout)
         self.setWidget(widget)
+
+
+    def pathfinder_add(self):
+        Krita.instance().action('object_unite').trigger()
+        self.exec_()
+
+    def pathfinder_intersect(self):
+        Krita.instance().action('object_intersect').trigger()
+        self.exec_()
+
+    def pathfinder_subtract(self):
+        Krita.instance().action('object_subtract').trigger()
+        self.exec_()
+
+    def pathfinder_split(self):
+        Krita.instance().action('object_split').trigger()
+
 
     def exec_(self):
         global tolr,quality,remv_orig
@@ -507,5 +551,6 @@ class Simplify_docker(DockWidget):
         # message(f' Push Button {tolr},{quality}')
         main(tolr,quality,remv_orig)
         
+
     def canvasChanged(self, canvas):
         pass
