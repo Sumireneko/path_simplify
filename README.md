@@ -3,6 +3,16 @@ Krita plugin for vector path simplify.
 
 About Path Simplify plug-in
 ---------------------------
+#### v0.5
+Add Boolean Shortcut buttons in the Docker  
+These buttons are shortcut for apply this simplify path plugin after Boolean operation.  
+Because in Krita (currently 5.2.5 former),It create a lot of segments with boolean operation of vector pathes.  
+The following buttons are available.  
+* Unite(with Simplify):Create boolean union of mutiple shapes
+* Intersect(with Simplify):Create intersection of mutiple shapes
+* Subtract(with Simplify):Subtract multiple objects from the first selected one
+* Split(with Simplify):Split shapes with multiple subpaths into multiple shapes
+
 #### v0.4
 Keep former selection if replace original  
 (The initial shape selection is maintained so you know which shape has been updated.)  
