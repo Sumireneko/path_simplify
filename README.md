@@ -3,6 +3,13 @@ Krita plugin for vector path simplify.
 
 About Path Simplify plug-in
 ---------------------------
+
+#### v0.6
+It also works when lines and curves segents are mixed (however, the curved parts are converted to lines, so there may be more points than before).
+* it can be convert a vector brush path to simply line path (with outline)
+* CurvePath and Open Path support. but total points are increase by convert the curve to line segments
+* Make no process in the case that a short line path and the caes that zero array length.
+
 #### v0.5
 Add Boolean Shortcut buttons in the Docker  
 These buttons are shortcut for apply this simplify path plugin after Boolean operation.  
