@@ -36,17 +36,20 @@ def parse(p):
     cp_match = None # closed path match
     division = 10
     pattern = r'^M?\s*([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)'
+
     match = re.search(pattern, p)
     prev_x, prev_y = None, None
     if match:
         prev_x = float(match.group(1))
         prev_y = float(match.group(2))
-        print("start:", prev_x, prev_y)
+        ms.append(f"{prev_x} {prev_y}")
+        #print("start:", prev_x, prev_y)
     else:
         raise ValueError("Start coord is Not found")
     
     pattern2 = r"Z$"  # Z command is exist at last wether or not 
     cp_match = re.search(pattern2, p)
+
 
     # extract SVG path commands
     commands = re.findall(r'[MLHVCSQTAZ][^MLHVCSQTAZ]*', p)
@@ -165,7 +168,8 @@ def get_array(name,path, tolr, quality):
         message("Path data (d attribute) not found.")
         return None
     p = p_match.group(1)
-    
+
+
     # Check for line segment compatibility, re.IGNORECASE
     mat = re.search(r'[csqthva]', p)
     if mat:
@@ -183,12 +187,16 @@ So it will works.
         ''')
         return None
 
+
+
+
     if str(p) is None:print('No match');return None
 
     # Make simple data for treat easily
     #  d="blahblah" ->  L00 00,L00 00... -> {'x':00,'y':00}...
 
     # Split by Hole Paths,  ps = ['274 995L272 706L....
+
     ps=re.split('M',p);ps.pop(0);
 
     ms = []
@@ -242,6 +250,7 @@ So it will works.
             
             o+=f"{type}{x} {y}"
 
+        #message(zs[cnt])
         o+="Z" if zs[cnt] else ""
         # ms for loop end
     # make one smplifyed path data
