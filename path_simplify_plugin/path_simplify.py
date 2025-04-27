@@ -1,5 +1,5 @@
 # ======================================
-# Krita path simplify plug-in v0.5
+# Krita path simplify plug-in v0.6
 # ======================================
 # Copyright (C) 2024 L.Sumireneko.M
 # This program is free software: you can redistribute it and/or modify it under the 
@@ -29,39 +29,146 @@ remv_orig = False # Remove original
 # ====================
 # Krita io function
 # ====================
+def parse(p):
 
-def get_array(name,path,tolr,quality):
-    # Filterling 
+    # p = xxx yyyC ...
+    ms = [] # points data  ['xx yy',...]
+    cp_match = None # closed path match
+    division = 10
+    pattern = r'^M?\s*([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)'
+    match = re.search(pattern, p)
+    prev_x, prev_y = None, None
+    if match:
+        prev_x = float(match.group(1))
+        prev_y = float(match.group(2))
+        print("start:", prev_x, prev_y)
+    else:
+        raise ValueError("Start coord is Not found")
+    
+    pattern2 = r"Z$"  # Z command is exist at last wether or not 
+    cp_match = re.search(pattern2, p)
+
+    # extract SVG path commands
+    commands = re.findall(r'[MLHVCSQTAZ][^MLHVCSQTAZ]*', p)
+
+
+    for command in commands:
+        type = command[0]
+        # extract number and parse float
+        values = list(map(float, re.findall(r'-?\d+\.?\d*', command[1:])))
+        
+        if type in ('M', 'L'):  # MoveTo, LineTo
+            x, y = values[:2]
+            ms.append(f"{x} {y}")
+            prev_x, prev_y = x, y
+
+        elif type == 'H':  # Horizontal line
+            x = values[0]
+            if prev_y is not None:
+                ms.append(f"{x} {prev_y}")
+            prev_x = x
+
+        elif type == 'V':  # Vertical line
+            y = values[0]
+            if prev_x is not None:
+                ms.append(f"{prev_x} {y}")
+            prev_y = y
+
+        elif type in ('C', 'S', 'Q', 'T', 'A'):  # Curves and arcs
+
+            if type == 'C':
+                if len(values) % 6 != 0:
+                    print(f"Unexpected number of parameters in C command: {values}")
+                else:
+                    for i in range(0, len(values), 6):  # read 6 params
+                        x1, y1, x2, y2, x3, y3 = values[i:i+6]
+                        for t in range(division + 1):
+                            t /= division
+                            bx = (1 - t)**3 * prev_x + 3 * (1 - t)**2 * t * x1 + 3 * (1 - t) * t**2 * x2 + t**3 * x3
+                            by = (1 - t)**3 * prev_y + 3 * (1 - t)**2 * t * y1 + 3 * (1 - t) * t**2 * y2 + t**3 * y3
+                            ms.append(f"{bx} {by}")
+                        prev_x, prev_y = x3, y3
+
+            elif type == 'S':  # Smooth Cubic Bezier curve
+                # start
+                x0, y0 = prev_x, prev_y
+                # use reflection of previous control point(simply use same previous point )
+                x1, y1 = prev_x, prev_y
+                x2, y2, x3, y3 = values
+                for i in range(division + 1):
+                    t = i / division
+                    bx = (1 - t)**3 * x0 + 3 * (1 - t)**2 * t * x1 + 3 * (1 - t) * t**2 * x2 + t**3 * x3
+                    by = (1 - t)**3 * y0 + 3 * (1 - t)**2 * t * y1 + 3 * (1 - t) * t**2 * y2 + t**3 * y3
+                    ms.append(f"{bx} {by}")
+                prev_x, prev_y = x3, y3
+
+            elif type == 'Q':  # Quadratic Bezier curve
+                # start
+                x0, y0 = prev_x, prev_y
+                # one control point and last point
+                x1, y1, x2, y2 = values
+                for i in range(division + 1):
+                    t = i / division
+                    bx = (1 - t)**2 * x0 + 2 * (1 - t) * t * x1 + t**2 * x2
+                    by = (1 - t)**2 * y0 + 2 * (1 - t) * t * y1 + t**2 * y2
+                    ms.append(f"{bx} {by}")
+                prev_x, prev_y = x2, y2
+        
+            elif type == 'T':  # Smooth Quadratic Bezier curve
+                # start
+                x0, y0 = prev_x, prev_y
+                # use reflection  of previous control point(simply use same previous point )
+                x1, y1 = prev_x, prev_y
+                # last point only
+                x2, y2 = values
+                for i in range(division + 1):
+                    t = i / division
+                    bx = (1 - t)**2 * x0 + 2 * (1 - t) * t * x1 + t**2 * x2
+                    by = (1 - t)**2 * y0 + 2 * (1 - t) * t * y1 + t**2 * y2
+                    ms.append(f"{bx} {by}")
+                prev_x, prev_y = x2, y2
+        
+            elif type == 'A':  # Arc
+                # start
+                x0, y0 = prev_x, prev_y
+                # parameter rx, ry, x_axis_rotation, large_arc_flag, sweep_flag, last(x, y)
+                rx, ry, x_axis_rotation, large_arc_flag, sweep_flag, x, y = values
+                # not use acculate elipse arc for convert,impliment with line interpolate
+                for i in range(division + 1):
+                    t = i / division
+                    bx = rx * (1 - t) + t * x
+                    by = ry * (1 - t) + t * y
+                    ms.append(f"{bx} {by}")
+                prev_x, prev_y = x, y
+
+    return cp_match,ms
+
+def get_array(name,path, tolr, quality):
     if not path.startswith('<path'):
-        message("Selected shape isn't Path Line \n  Circle,Rectangle and Polyline are \n no need to simplify probably.")
+        message("Selected shape isn't a Path Line. Circle, Rectangle, and Polyline probably don't need simplification.")
         return None
- 
-    # get original path information
-    # id = re.search(r'\sid="(.*?)"', path ).group(1)
-    
-    # path data
-    p = re.search(r'\sd="(.*?)"', path )
-    
+
     # other attributes
-    tr = re.search(r'\s(transform=".*?")', path )
-    fi = re.search(r'\s(fill=".*?")', path )
-    st = re.search(r'\s(stroke=".*?")', path )
-    sw = re.search(r'\s(stroke-width=".*?")', path )
-    ca = re.search(r'\s(stroke-linecap=".*?")', path )
-    jo = re.search(r'\s(stroke-linejoin=".*?")', path )
+    at = {
+        "tr": re.search(r'\s(transform=".*?")', path),
+        "fi": re.search(r'\s(fill=".*?")', path),
+        "st": re.search(r'\s(stroke=".*?")', path),
+        "sw": re.search(r'\s(stroke-width=".*?")', path),
+        "sc": re.search(r'\s(stroke-linecap=".*?")', path),
+        "sj": re.search(r'\s(stroke-linejoin=".*?")', path)
+    }
+    at = {k: (v.group(1) if v else "") for k, v in at.items()}
 
-    tr = "" if tr is None else tr.group(1)
-    fi = "" if fi is None else fi.group(1)
-    st = "" if st is None else st.group(1)
-    sw = "" if sw is None else sw.group(1)
-    ca = "" if ca is None else ca.group(1)
-    jo = "" if jo is None else jo.group(1)
-
-
-    # Currently Not support expect Line segment
-    mat=re.search(r'(?i)(C|S|Q|T|H|V|A)',str(p.group(1)))
-    # print(mat)
-    if not mat is None:
+    # Path data
+    p_match = re.search(r'\sd="(.*?)"', path)
+    if not p_match:
+        message("Path data (d attribute) not found.")
+        return None
+    p = p_match.group(1)
+    
+    # Check for line segment compatibility, re.IGNORECASE
+    mat = re.search(r'[csqthva]', p)
+    if mat:
         message(
         '''=== ERROR : Line segment ONLY support ===
 The shape contain Spline or Bezier curve
@@ -80,21 +187,25 @@ So it will works.
 
     # Make simple data for treat easily
     #  d="blahblah" ->  L00 00,L00 00... -> {'x':00,'y':00}...
-    dd = str(p.group(1))
-    dd=re.sub(r'[Z"]','',dd)
 
     # Split by Hole Paths,  ps = ['274 995L272 706L....
-    ps=re.split('M',dd);ps.pop(0);
-    # print(ps)
+    ps=re.split('M',p);ps.pop(0);
 
-    # Split by LinePath ,  ms = [['274 208','272 706', ...
     ms = []
-    for i in range(0,len(ps)):
-        ms.append(re.split(r'L',ps[i]))
-    # print(ms)
-    
+    zs = []
+
+    # ms = ['274 208','272 706', ..., zs= [ Zmatch , None ... ]
+    for i in range(0,len(ps)): 
+        closed_match,point_pair =parse(ps[i])
+        if len(point_pair) == 0:continue
+        if len(point_pair) <= 4:continue
+        zs.append(closed_match)
+        ms.append(point_pair)
+
+    if len(ms) == 0:return None
     # Split by separate (White space),and make dict   {'x':00,'y':00} ...
     o=''
+    cnt = 0
     for d in ms:
         x=y=""
         pary={}
@@ -115,6 +226,8 @@ So it will works.
         #message(f'Process {tolr},{quality}')
         vs = simplify(pary, tolr, quality)
         
+        notice_autoclose_dialog(f"Updated the total points from {len(d)} to {len(vs)}")
+
         # array to point data
         # print(str(holes))
         for j in range(0,len(vs)):
@@ -128,14 +241,16 @@ So it will works.
             y = round(y, 5)
             
             o+=f"{type}{x} {y}"
-        o+="Z"
+
+        o+="Z" if zs[cnt] else ""
         # ms for loop end
     # make one smplifyed path data
-    o=f'<path id="{name}" {tr} {fi} {st} {sw} {ca} {jo} d="{o}"/>'
+    o=f'<path id="{name}" {at["tr"]} {at["fi"]} {at["st"]} {at["sw"]} {at["sc"]} {at["sj"]} d="{o}"/>'
     
     # print("=== simplified ===")
     # print(o)
     return o
+
 
 
 # ================================================================
@@ -307,9 +422,6 @@ def dprint(text):
 # ====================
 # Main function
 # ====================
-
-
-
 def main(tolr,quality,remv_orig):
     app = Krita.instance()
     doc = app.activeDocument()

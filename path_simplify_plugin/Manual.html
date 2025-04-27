@@ -17,7 +17,7 @@
 <body class="body">
 <!-- Path Simplify by L.Sumireneko.M -->
 <h2>About Path Simplify plug-in</h2>
-<h4>v0.5</h4>
+<h4>v0.6</h4>
 <h3>About</h3>
 <p>
 	This plug-in provide simplify for vector path.<br>
@@ -26,6 +26,9 @@
 	<br>
 	If work success,it would be append new Vector Layer as contain simplified path data.<br>
 	(Also,You can enable the option that "Remove original path",this mode does not create new layer)<br>
+
+	In v0.6,it can be convert a vector brush path to simply line path (with outline)
+
 	<ul>
 	<li>Support Line segement(SVG &lt;path>) shape only 
 	<li>For multiple shapes that selected
@@ -36,6 +39,9 @@
 	<li>Notice dialog (It appear when finish simplified ,and automatically close in 1500 msec after) (v0.3)
 	<li>Keep former selection if replace original (v0.4)
 	<li>Add integrate Boolean Operation buttons(Unite,Intersect,Subtract,Split) (v0.5)<br>
+	<li>CurvePath,Open Path support. but total points are increase by convert the curve to line segments (v0.6)<br>
+	<li>Make no process in the case that a short line path and the caes that zero array length.(v0.6)<br>
+<br>
 	 These are one-button shortcut for <em>Boolean operation → Simplify</em> workflow :-)<br>
 </ul>
 	
