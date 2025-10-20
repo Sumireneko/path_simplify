@@ -4,7 +4,7 @@ Krita plugin for vector path simplify.
 About Path Simplify plug-in
 ---------------------------
 #### v0.7
-* Tested by Krita v5.2.14(PyQT5 with Python 3.13)
+* Tested with Krita v5.2.14(PyQT5 with Python 3.13)
  * Preliminary PyQt6 compatibility added Updated import logic to support PyQt6 for future Krita 6.x compatibility.
  * Note: PyQt6 functionality has not been tested yet. This change is preparatory and not guaranteed to be stable.
  * Add about window.The window can be invoked by clicking [i] icon.
