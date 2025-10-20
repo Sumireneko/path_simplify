@@ -1,7 +1,7 @@
 # ======================================
-# Krita path simplify plug-in v0.6
+# Krita path simplify plug-in v0.7
 # ======================================
-# Copyright (C) 2024 L.Sumireneko.M
+# Copyright (C) 2025 L.Sumireneko.M
 # This program is free software: you can redistribute it and/or modify it under the 
 # terms of the GNU General Public License as published by the Free Software Foundation,
 # either version 3 of the License, or (at your option) any later version.
@@ -13,15 +13,36 @@
 # You should have received a copy of the GNU General Public License along with this program.
 # If not, see <https://www.gnu.org/licenses/>. 
 
+import re, math, time
+import krita
+try:
+    if int(krita.qVersion().split('.')[0]) == 5:
+        raise
+
+    # PyQt6
+    from PyQt6.QtWidgets import (
+        QApplication, QDialog, QTextEdit, QVBoxLayout, QPushButton, QRadioButton, QButtonGroup
+    )
+    from PyQt6.QtGui import *
+    from PyQt6.QtCore import (
+        QObject, QEvent, QTimer, QSignalBlocker, pyqtSignal, QPointF, Qt
+    )
+    from PyQt6 import QtCore
+
+except:
+    # PyQt5 fallback
+    from PyQt5.QtWidgets import (
+        QApplication, QDialog, QTextEdit, QVBoxLayout, QPushButton, QRadioButton, QButtonGroup
+    )
+    from PyQt5.QtGui import *
+    from PyQt5.QtCore import (
+        QObject, QEvent, QTimer, QSignalBlocker, pyqtSignal, QPointF, Qt
+    )
+    from PyQt5 import QtCore
+
 from krita import *
-from PyQt5.QtWidgets import *
-from PyQt5.Qt import *
-from PyQt5.QtGui import *
-from PyQt5 import QtCore
-import re,math,time
 
-
-
+version_ = 0.7
 tolr = 0.8 # Tolerance smooth 0.8 - 1.5 rough
 quality = True # precision mode ( Default:True)
 remv_orig = False # Remove original
@@ -585,6 +606,8 @@ btn_s = QPushButton();btn_s.setIcon(Krita.instance().icon('selection_subtract'))
 btn_sp = QPushButton();btn_sp.setIcon(Krita.instance().icon('selection_symmetric_difference'))
 
 
+
+
 btn_u.setToolTip('Unite(Simplify):Create boolean union of mutiple shapes')
 btn_i.setToolTip('Intersect(Simplify):Create intersection of mutiple shapes')
 btn_s.setToolTip('Subtract(Simplify):Subtract multiple objects from the first selected one')
@@ -603,6 +626,37 @@ def get_param(txt):
     num=float(eval(txt))
     #print("Calculated:"+str(num))
     return num
+# ====================================
+# Log Window Class
+# ====================================
+class LogWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("About")
+        self.resize(400, 300)
+
+        self.text_area = QTextEdit(self)
+        self.text_area.setReadOnly(True)
+
+        close_button = QPushButton("Close", self)
+        close_button.clicked.connect(self.close)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.text_area)
+        layout.addWidget(close_button)
+        self.setLayout(layout)
+
+    def append_log(self, message):
+        self.text_area.append(message)
+        self.text_area.moveCursor(QTextCursor.Start)
+
+    def clear_log(self):
+        self.text_area.clear()
+
+    def closeEvent(self, event):
+        if self.parent():
+            self.parent().log_window = None
+        super().closeEvent(event)
 
 # ====================================
 # Main Class
@@ -617,11 +671,43 @@ class Simplify_docker(DockWidget):
         total_layout = QHBoxLayout()
         
         btn = QPushButton("Simplify the selected\n Vector shape!",self)
-        btn.setToolTip('This can apply to SVG path with\n line segment only')
+        btn.setToolTip('This can apply to SVG path shapes(single/multiple)')
         btn.clicked.connect(self.exec_)
-        labele = QLabel('Reduce points of Vector Path for\n * Boolean-ed Shape \n * Create shape from Selection\n * No for Ellipse and Rectangle')
-        
-        layout.addWidget(labele)
+
+        self.log_window = None
+        label_info=[
+            '------------------------------------',
+            f'Path Simplify Plug-in ver {version_}',
+            '------------------------------------',
+            'Reduce points of Vector Path for:',
+            ' * Boolean-ed Shape',
+            ' * Create shape from Selection',
+            ' * No for Ellipse and Rectangle',
+            ' ',
+            'Tolerance parameter:(Default:0.8)',
+            ' * Ineffective: 0.0 - 0.4 ',
+            ' * Get good result: 0.5 - 1.0',
+            ' * More polygonalized: 1.5 - 2.5',
+            ' ',
+            'Boolean path fix options:',
+            'How to use:',
+            '1. Select two or more overlapping shapes.',
+            '2. Click one of the following buttons.',
+            ' ',
+            ' * Unite(Simplify):\n Create boolean union of mutiple shapes \n',
+            ' * Intersect(Simplify):\n Create intersection of mutiple shapes\n',
+            ' * Subtract(Simplify):\n Subtract multiple objects from the first selected one\n',
+            ' * Split:\n Split shapes with multiple subpaths into multiple shapes',
+            ' ',
+            'Note:\n In currently Krita(v5.2.14) boolean commands',
+            'these could not get simply path result',
+            'So this plugin enables support by bypassing these commands.'
+        ]
+        infobtn = QPushButton();infobtn.setIcon(Krita.instance().icon('selection-info'))
+        infobtn.clicked.connect(lambda text: self.show_info(label_info))
+        infobtn.setFixedSize(25, 25)
+        hbox.addWidget(infobtn)
+
         layout.addLayout(hbox)
         layout.addLayout(hbox2)
         layout.addLayout(hbox3)
@@ -675,3 +761,35 @@ class Simplify_docker(DockWidget):
 
     def canvasChanged(self, canvas):
         pass
+
+    # ----------------
+    # log window
+    # ----------------
+
+    def show_info(self,array):
+        slog=[]
+        for a in array:
+            lines = a
+            slog.append(f"{a}")
+
+        # call_log window
+        if self.log_window is None:
+            self.add_log_message("\n".join(slog))
+
+
+
+    def show_log_window(self):
+        if self.log_window is None:
+            self.log_window = LogWindow(self)
+
+        self.log_window.show()
+        self.log_window.raise_()  # bring to front
+        self.log_window.activateWindow()
+
+    def add_log_message(self, message):
+        if self.log_window is None:
+            self.show_log_window()
+        self.log_window.clear_log()
+        self.log_window.append_log(message)
+
+
