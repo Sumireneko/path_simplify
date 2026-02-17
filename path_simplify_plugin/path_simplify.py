@@ -1,7 +1,7 @@
 # ======================================
-# Krita path simplify plug-in v0.7
+# Krita path simplify plug-in v0.8
 # ======================================
-# Copyright (C) 2025 L.Sumireneko.M
+# Copyright (C) 2026 L.Sumireneko.M
 # This program is free software: you can redistribute it and/or modify it under the 
 # terms of the GNU General Public License as published by the Free Software Foundation,
 # either version 3 of the License, or (at your option) any later version.
@@ -15,34 +15,15 @@
 
 import re, math, time
 import krita
-try:
-    if int(krita.qVersion().split('.')[0]) == 5:
-        raise
+from .qt_compat import qt_exec,QC
+from .qt_compat import (
+    QtWidgets, QtCore, QtGui, QC, qt_exec, qt_event,QHBoxLayout,QVBoxLayout,
+    QApplication, QDialog, QTextEdit, QVBoxLayout, QPushButton,QCheckBox,
+    QRadioButton, QButtonGroup, QObject, QEvent, QTimer, QLabel,QDockWidget,
+    QSignalBlocker, pyqtSignal, QLineEdit, QPointF, Qt,QWidget,QTextCursor
+)
 
-    # PyQt6
-    from PyQt6.QtWidgets import (
-        QApplication, QDialog, QTextEdit, QVBoxLayout, QPushButton, QRadioButton, QButtonGroup
-    )
-    from PyQt6.QtGui import *
-    from PyQt6.QtCore import (
-        QObject, QEvent, QTimer, QSignalBlocker, pyqtSignal, QPointF, Qt
-    )
-    from PyQt6 import QtCore
-
-except:
-    # PyQt5 fallback
-    from PyQt5.QtWidgets import (
-        QApplication, QDialog, QTextEdit, QVBoxLayout, QPushButton, QRadioButton, QButtonGroup
-    )
-    from PyQt5.QtGui import *
-    from PyQt5.QtCore import (
-        QObject, QEvent, QTimer, QSignalBlocker, pyqtSignal, QPointF, Qt
-    )
-    from PyQt5 import QtCore
-
-from krita import *
-
-version_ = 0.7
+version_ = 0.8
 tolr = 0.8 # Tolerance smooth 0.8 - 1.5 rough
 quality = True # precision mode ( Default:True)
 remv_orig = False # Remove original
@@ -411,35 +392,45 @@ def simplify(points, tolerance=0.1, highestQuality=True):
 # ====================
 # Utilities
 # ====================
+
 def message(mes):
     mb = QMessageBox()
     mb.setText(str(mes))
     mb.setWindowTitle('Message')
-    mb.setStandardButtons(QMessageBox.Ok)
-    ret = mb.exec()
-    if ret == QMessageBox.Ok:
+    mb.setStandardButtons(QC.StdBtn.Ok) 
+    
+    ret = qt_exec(mb) 
+
+    if ret == QC.StdBtn.Ok:
         pass # OK clicked
 
+
 # create dialog  and show it
-def notice_autoclose_dialog(message):
+def notice_autoclose_dialog(message_text):
     app = Krita.instance()
     qwin = app.activeWindow().qwindow()
     qq = qwin.size()
+    
     wpos = math.ceil(qq.width() * 0.45)
     hpos = math.ceil(qq.height() * 0.45)
-    
-    noticeDialog = QDialog() 
-    noticeDialog.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-    label = QLabel(message)
+
+    noticeDialog = QDialog()
+
+    noticeDialog.setWindowFlags(QC.Window.FramelessWindowHint)
+
+    label = QLabel(message_text)
     hboxd = QHBoxLayout()
     hboxd.addWidget(label)
     noticeDialog.setLayout(hboxd)
-    noticeDialog.setWindowTitle("Title") 
+    noticeDialog.setWindowTitle("Title")
+    # print("qwin.x() wpos hpos = ",qwin.x(),wpos,hpos)
+    noticeDialog.move(qwin.x() + wpos, qwin.y() + hpos)
     
-    print(qwin.x(),wpos,hpos)
-    noticeDialog.move(qwin.x()+wpos,qwin.y()+hpos)
+    # Close window
     QtCore.QTimer.singleShot(1500, noticeDialog.close)
-    noticeDialog.exec_() # show
+
+    qt_exec(noticeDialog)
+
 
 # debug
 
@@ -648,7 +639,7 @@ class LogWindow(QDialog):
 
     def append_log(self, message):
         self.text_area.append(message)
-        self.text_area.moveCursor(QTextCursor.Start)
+        self.text_area.moveCursor(QC.TextMove.Start)
 
     def clear_log(self):
         self.text_area.clear()
@@ -661,7 +652,7 @@ class LogWindow(QDialog):
 # ====================================
 # Main Class
 # ====================================
-class Simplify_docker(DockWidget):
+class Simplify_docker(krita.DockWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Path Simplify")
@@ -732,15 +723,15 @@ class Simplify_docker(DockWidget):
 
     def pathfinder_add(self):
         Krita.instance().action('object_unite').trigger()
-        self.exec_()
+        qt_exec(self)
 
     def pathfinder_intersect(self):
         Krita.instance().action('object_intersect').trigger()
-        self.exec_()
+        qt_exec(self)
 
     def pathfinder_subtract(self):
         Krita.instance().action('object_subtract').trigger()
-        self.exec_()
+        qt_exec(self)
 
     def pathfinder_split(self):
         Krita.instance().action('object_split').trigger()
@@ -748,11 +739,16 @@ class Simplify_docker(DockWidget):
 
     def exec_(self):
         global tolr,quality,remv_orig
-        if QtCore.Qt.Checked == chkbox.checkState():quality = True
-        else:quality = False
+        if QC.CheckState.Checked == chkbox.checkState():
+            quality = True
+        else:
+            quality = False
 
-        if QtCore.Qt.Checked == chkbox2.checkState():remv_orig = True
-        else:remv_orig = False
+        if QC.CheckState.Checked == chkbox2.checkState():
+            remv_orig = True
+        else:
+            remv_orig = False
+
 
         tolr = get_param(texbox.text())
         # message(f' Push Button {tolr},{quality}')
