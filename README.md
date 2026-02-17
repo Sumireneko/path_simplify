@@ -1,5 +1,6 @@
 # path_simplify
 Krita plugin for vector path simplify.
+(It assumes usage on Krita v5.3.0 and/or v6.0.0) 
 
 About Path Simplify plug-in
 ---------------------------
